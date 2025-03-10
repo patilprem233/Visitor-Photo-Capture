@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visitor Photo Capture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #3c8dbc;
+            text-align: center;
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f4f4f4;
+        }
+        .webcam-display {
+            width: 320px;
+            height: 240px;
+            border: 1px solid #ccc;
+            margin: 10px auto;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f5f5f5;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+        }
+        #canvas {
+            display: none;
+        }
+        .btn-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .capture-btn {
+            background-color: #3c8dbc;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        .capture-btn:hover {
+            background-color: #367fa9;
+        }
+        .capture-btn:disabled {
+            background-color: #cccccc;
+        }
+        .status {
+            text-align: center;
+            padding: 8px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Visitor Photo Capture</h2>
+        
+        <div class="webcam-display" id="camera-container">
+            <video id="video" autoplay playsinline></video>
+            <img id="capturedImage" style="display:none; max-width:100%; max-height:100%;">
+        </div>
+        
+        <canvas id="canvas" style="display:none;"></canvas>
+        
+        <div class="btn-container">
+            <button id="captureBtn" class="capture-btn">Capture Photo</button>
+            <button id="retakeBtn" class="capture-btn" disabled>Retake</button>
+            <button id="doneBtn" class="capture-btn" disabled>Done</button>
+        </div>
+        
+        <div id="statusMessage" class="status" style="display:none;"></div>
+    </div>
+
+    <script>
+        // Get session ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+        
+        // Elements
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const capturedImage = document.getElementById('capturedImage');
+        const captureBtn = document.getElementById('captureBtn');
+        const retakeBtn = document.getElementById('retakeBtn');
+        const doneBtn = document.getElementById('doneBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        
+        // Variables
+        let stream = null;
+        let imageData = null;
+        
+        // Initialize webcam
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                showStatus('Camera ready', 'success');
+            } catch (err) {
+                showStatus('Error accessing camera: ' + err.message, 'error');
+            }
+        }
+        
+        // Capture photo
+        function capturePhoto() {
+            try {
+                // Set canvas dimensions
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // Draw video frame to canvas
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Get image data
+                imageData = canvas.toDataURL('image/jpeg');
+                
+                // Display captured image
+                capturedImage.src = imageData;
+                capturedImage.style.display = 'block';
+                video.style.display = 'none';
+                
+                // Update buttons
+                captureBtn.disabled = true;
+                retakeBtn.disabled = false;
+                doneBtn.disabled = false;
+                
+                showStatus('Photo captured successfully', 'success');
+            } catch (err) {
+                showStatus('Error capturing photo: ' + err.message, 'error');
+            }
+        }
+        
+        // Retake photo
+        function retakePhoto() {
+            capturedImage.style.display = 'none';
+            video.style.display = 'block';
+            imageData = null;
+            
+            captureBtn.disabled = false;
+            retakeBtn.disabled = true;
+            doneBtn.disabled = true;
+        }
+        
+        // Complete capture and return to main page
+        function completeCapture() {
+            if (!imageData) {
+                showStatus('No photo captured', 'error');
+                return;
+            }
+            
+            try {
+                // Send image back to parent window
+                if (window.opener && !window.opener.closed) {
+                    window.opener.handleExternalCapture(imageData);
+                    window.close();
+                } else {
+                    showStatus('Cannot communicate with main window', 'error');
+                }
+            } catch (err) {
+                showStatus('Error completing capture: ' + err.message, 'error');
+            }
+        }
+        
+        // Show status message
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = 'status ' + type;
+            statusMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Event listeners
+        captureBtn.addEventListener('click', capturePhoto);
+        retakeBtn.addEventListener('click', retakePhoto);
+        doneBtn.addEventListener('click', completeCapture);
+        
+        // Start camera when page loads
+        window.addEventListener('DOMContentLoaded', startCamera);
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>
