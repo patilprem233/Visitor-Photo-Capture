@@ -115,7 +115,7 @@
         <div id="statusMessage" class="status" style="display:none;"></div>
         
         <div id="manualInstructions" class="manual-instructions">
-            <p><strong>If automatic transfer fails:</strong></p>
+            <p><strong>Please follow these steps:</strong></p>
             <p>1. Copy the image data below</p>
             <p>2. Close this window</p>
             <p>3. Click "Paste Photo Data" on the main form</p>
@@ -139,11 +139,12 @@
         const imageDataText = document.getElementById('imageDataText');
         const copyBtn = document.getElementById('copyBtn');
         
-        // Variables usingsg
+        // Variables
         let stream = null;
         let imageData = null;
+        let originUrl = document.referrer || '';
         
-        // Initializezz webcam
+        // Initialize webcam
         async function startCamera() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ 
@@ -160,21 +161,23 @@
         // Capture photo
         function capturePhoto() {
             try {
-                //  canvas dimensions n ALL
+                // Set canvas dimensions
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 
-                // Draw video frame in thee  canvas
+                // Draw video frame to canvas
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
                 // Get image data
                 imageData = canvas.toDataURL('image/jpeg');
                 
+                // Display captured image
                 capturedImage.src = imageData;
                 capturedImage.style.display = 'block';
                 video.style.display = 'none';
                 
+                // Update buttons
                 captureBtn.disabled = true;
                 retakeBtn.disabled = false;
                 doneBtn.disabled = false;
@@ -198,7 +201,7 @@
             manualInstructions.style.display = 'none';
         }
         
-        // captiuring and returing to main page 
+        // Complete capture and return to main page
         function completeCapture() {
             if (!imageData) {
                 showStatus('No photo captured', 'error');
@@ -209,38 +212,60 @@
                 // Store the image data in localStorage
                 localStorage.setItem('visitorCapturedImage', imageData);
                 
-                // Try to redirect back to the opener with a special parameter
+                // Try multiple methods to return the image
+                
+                // Method 1: Try postMessage API
                 if (window.opener) {
                     try {
-                        // Try direct communication first
+                        window.opener.postMessage({
+                            type: 'VISITOR_PHOTO_CAPTURED',
+                            imageData: imageData
+                        }, '*');
+                        
+                        // Wait a moment before closing to allow message to be received
+                        setTimeout(() => {
+                            window.close();
+                        }, 500);
+                        
+                        return;
+                    } catch (e) {
+                        console.log("postMessage failed:", e);
+                    }
+                }
+                
+                // Method 2: Try direct function call
+                if (window.opener && typeof window.opener.handleExternalCapture === 'function') {
+                    try {
                         window.opener.handleExternalCapture(imageData);
                         window.close();
                         return;
                     } catch (e) {
-                        console.log("Direct communication failed, trying redirect method");
+                        console.log("Direct function call failed:", e);
                     }
-                    
-                    // If direct communication fails, try redirect method
-                    try {
-                        const returnUrl = window.opener.location.href;
-                        window.opener.location.href = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 
-                            'photoCapture=complete&timestamp=' + new Date().getTime();
-                        window.close();
-                    } catch (e) {
-                        // If redirect fails, show manual instructions
-                        showManualInstructions();
-                    }
-                } else {
-                    // If no opener is detected, show manual instructions
-                    showManualInstructions();
                 }
+                
+                // Method 3: Try redirect with parameter
+                if (window.opener) {
+                    try {
+                        const returnUrl = window.opener.location.href.split('?')[0]; // Get base URL without parameters
+                        window.opener.location.href = returnUrl + '?photoCapture=complete&timestamp=' + new Date().getTime();
+                        window.close();
+                        return;
+                    } catch (e) {
+                        console.log("Redirect method failed:", e);
+                    }
+                }
+                
+                // If all automatic methods fail, show manual instructions
+                showManualInstructions();
+                
             } catch (err) {
                 showStatus('Error completing capture: ' + err.message, 'error');
                 showManualInstructions();
             }
         }
         
-        // Show manual instructions if automatic transfer fails
+        // Show manual instructions
         function showManualInstructions() {
             manualInstructions.style.display = 'block';
             imageDataText.value = imageData;
