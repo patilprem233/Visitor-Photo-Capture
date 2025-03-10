@@ -98,13 +98,18 @@
         </div>
         
         <div id="statusMessage" class="status" style="display:none;"></div>
+        
+        <div id="manualInstructions" class="manual-instructions">
+            <p><strong>If the window doesn't close automatically:</strong></p>
+            <p>1. Copy the image data below</p>
+            <p>2. Close this window</p>
+            <p>3. Paste the data into the main form</p>
+            <textarea id="imageDataText" style="width: 100%; height: 100px; margin-top: 10px; display: none;"></textarea>
+            <button id="copyBtn" class="capture-btn" style="margin-top: 10px; display: none;">Copy Image Data</button>
+        </div>
     </div>
 
     <script>
-        // Get session ID from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get('session');
-        
         // Elements
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
@@ -113,6 +118,9 @@
         const retakeBtn = document.getElementById('retakeBtn');
         const doneBtn = document.getElementById('doneBtn');
         const statusMessage = document.getElementById('statusMessage');
+        const manualInstructions = document.getElementById('manualInstructions');
+        const imageDataText = document.getElementById('imageDataText');
+        const copyBtn = document.getElementById('copyBtn');
         
         // Variables
         let stream = null;
@@ -171,6 +179,10 @@
             captureBtn.disabled = false;
             retakeBtn.disabled = true;
             doneBtn.disabled = true;
+            
+            manualInstructions.style.display = 'none';
+            imageDataText.style.display = 'none';
+            copyBtn.style.display = 'none';
         }
         
         // Complete capture and return to main page
@@ -181,16 +193,47 @@
             }
             
             try {
-                // Send image back to parent window
-                if (window.opener && !window.opener.closed) {
-                    window.opener.handleExternalCapture(imageData);
-                    window.close();
+                // Store the image data in localStorage
+                localStorage.setItem('visitorCapturedImage', imageData);
+                
+                // Try to redirect back to the opener with a special parameter
+                const returnUrl = window.opener ? window.opener.location.href : '';
+                
+                if (returnUrl) {
+                    // Try to close this window and redirect the opener
+                    try {
+                        window.opener.location.href = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 
+                            'photoCapture=complete&timestamp=' + new Date().getTime();
+                        window.close();
+                    } catch (e) {
+                        // If direct communication fails, show manual instructions
+                        showManualInstructions();
+                    }
                 } else {
-                    showStatus('Cannot communicate with main window', 'error');
+                    // If no opener is detected, show manual instructions
+                    showManualInstructions();
                 }
             } catch (err) {
                 showStatus('Error completing capture: ' + err.message, 'error');
+                showManualInstructions();
             }
+        }
+        
+        // Show manual instructions if automatic transfer fails
+        function showManualInstructions() {
+            manualInstructions.style.display = 'block';
+            imageDataText.value = imageData;
+            imageDataText.style.display = 'block';
+            copyBtn.style.display = 'inline-block';
+            
+            showStatus('Please use manual transfer method', 'error');
+        }
+        
+        // Copy image data to clipboard
+        function copyImageData() {
+            imageDataText.select();
+            document.execCommand('copy');
+            showStatus('Image data copied to clipboard!', 'success');
         }
         
         // Show status message
@@ -208,6 +251,7 @@
         captureBtn.addEventListener('click', capturePhoto);
         retakeBtn.addEventListener('click', retakePhoto);
         doneBtn.addEventListener('click', completeCapture);
+        copyBtn.addEventListener('click', copyImageData);
         
         // Start camera when page loads
         window.addEventListener('DOMContentLoaded', startCamera);
