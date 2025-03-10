@@ -78,6 +78,21 @@
             background-color: #f2dede;
             color: #a94442;
         }
+        .manual-instructions {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        textarea {
+            width: 100%;
+            height: 80px;
+            margin-top: 10px;
+            font-size: 10px;
+            resize: none;
+        }
     </style>
 </head>
 <body>
@@ -100,12 +115,14 @@
         <div id="statusMessage" class="status" style="display:none;"></div>
         
         <div id="manualInstructions" class="manual-instructions">
-            <p><strong>If the window doesn't close automatically:</strong></p>
+            <p><strong>If automatic transfer fails:</strong></p>
             <p>1. Copy the image data below</p>
             <p>2. Close this window</p>
-            <p>3. Paste the data into the main form</p>
-            <textarea id="imageDataText" style="width: 100%; height: 100px; margin-top: 10px; display: none;"></textarea>
-            <button id="copyBtn" class="capture-btn" style="margin-top: 10px; display: none;">Copy Image Data</button>
+            <p>3. Click "Paste Photo Data" on the main form</p>
+            <textarea id="imageDataText" readonly></textarea>
+            <div class="btn-container">
+                <button id="copyBtn" class="capture-btn">Copy Image Data</button>
+            </div>
         </div>
     </div>
 
@@ -122,11 +139,11 @@
         const imageDataText = document.getElementById('imageDataText');
         const copyBtn = document.getElementById('copyBtn');
         
-        // Variables
+        // Variables usingsg
         let stream = null;
         let imageData = null;
         
-        // Initialize webcam
+        // Initializezz webcam
         async function startCamera() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ 
@@ -143,23 +160,21 @@
         // Capture photo
         function capturePhoto() {
             try {
-                // Set canvas dimensions
+                //  canvas dimensions n ALL
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 
-                // Draw video frame to canvas
+                // Draw video frame in thee  canvas
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
                 // Get image data
                 imageData = canvas.toDataURL('image/jpeg');
                 
-                // Display captured image
                 capturedImage.src = imageData;
                 capturedImage.style.display = 'block';
                 video.style.display = 'none';
                 
-                // Update buttons
                 captureBtn.disabled = true;
                 retakeBtn.disabled = false;
                 doneBtn.disabled = false;
@@ -181,11 +196,9 @@
             doneBtn.disabled = true;
             
             manualInstructions.style.display = 'none';
-            imageDataText.style.display = 'none';
-            copyBtn.style.display = 'none';
         }
         
-        // Complete capture and return to main page
+        // captiuring and returing to main page 
         function completeCapture() {
             if (!imageData) {
                 showStatus('No photo captured', 'error');
@@ -197,16 +210,24 @@
                 localStorage.setItem('visitorCapturedImage', imageData);
                 
                 // Try to redirect back to the opener with a special parameter
-                const returnUrl = window.opener ? window.opener.location.href : '';
-                
-                if (returnUrl) {
-                    // Try to close this window and redirect the opener
+                if (window.opener) {
                     try {
+                        // Try direct communication first
+                        window.opener.handleExternalCapture(imageData);
+                        window.close();
+                        return;
+                    } catch (e) {
+                        console.log("Direct communication failed, trying redirect method");
+                    }
+                    
+                    // If direct communication fails, try redirect method
+                    try {
+                        const returnUrl = window.opener.location.href;
                         window.opener.location.href = returnUrl + (returnUrl.includes('?') ? '&' : '?') + 
                             'photoCapture=complete&timestamp=' + new Date().getTime();
                         window.close();
                     } catch (e) {
-                        // If direct communication fails, show manual instructions
+                        // If redirect fails, show manual instructions
                         showManualInstructions();
                     }
                 } else {
@@ -223,8 +244,6 @@
         function showManualInstructions() {
             manualInstructions.style.display = 'block';
             imageDataText.value = imageData;
-            imageDataText.style.display = 'block';
-            copyBtn.style.display = 'inline-block';
             
             showStatus('Please use manual transfer method', 'error');
         }
