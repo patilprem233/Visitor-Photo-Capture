@@ -212,7 +212,6 @@
                 // Store the image data in localStorage
                 localStorage.setItem('visitorCapturedImage', imageData);
                 
-                // Try multiple methods to return the image
                 
                 // Method 1: Try postMessage API
                 if (window.opener) {
@@ -222,7 +221,6 @@
                             imageData: imageData
                         }, '*');
                         
-                        // Wait a moment before closing to allow message to be received
                         setTimeout(() => {
                             window.close();
                         }, 500);
@@ -265,7 +263,7 @@
             }
         }
         
-        // Show manual instructions
+        // Show  instructions
         function showManualInstructions() {
             manualInstructions.style.display = 'block';
             imageDataText.value = imageData;
@@ -297,10 +295,10 @@
         doneBtn.addEventListener('click', completeCapture);
         copyBtn.addEventListener('click', copyImageData);
         
-        // Start camera when page loads
+        // Start camera when  loads
         window.addEventListener('DOMContentLoaded', startCamera);
         
-        // Clean up on page unload
+        // Clean 
         window.addEventListener('beforeunload', () => {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
